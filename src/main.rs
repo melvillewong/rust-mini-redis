@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+
+use rust_mini_redis::proc_cmd;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpListener,
@@ -14,6 +17,7 @@ async fn main() -> std::io::Result<()> {
 
         tokio::spawn(async move {
             let mut buf = [0u8; 512];
+            let mut storage = HashMap::<String, String>::new();
 
             loop {
                 match socket.read(&mut buf).await {
@@ -22,10 +26,20 @@ async fn main() -> std::io::Result<()> {
                         return;
                     }
                     Ok(byte_read) => {
-                        if let Err(e) = socket.write_all(&buf[..byte_read]).await {
-                            eprintln!("Failed to write to {}: {}", addr, e);
-                            return;
+                        // echo back client's message
+                        let client_cmd = String::from_utf8_lossy(&buf[..byte_read]);
+                        match proc_cmd(&client_cmd, &mut storage) {
+                            Ok(res) => {
+                                if let Err(e) =
+                                    socket.write_all(format!("{}\n", res).as_bytes()).await
+                                {
+                                    eprintln!("Failed to write to {}: {}", addr, e);
+                                    return;
+                                }
+                            }
+                            Err(e) => eprintln!("{}", e),
                         }
+                        println!("{:?}", &storage);
                     }
                     Err(e) => {
                         eprintln!("Failed to read from {}: {}", addr, e);
