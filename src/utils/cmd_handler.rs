@@ -1,22 +1,17 @@
-use std::{
-    collections::HashMap,
-    io::{Error, ErrorKind::InvalidInput},
-    str::SplitWhitespace,
-    sync::Arc,
+use std::io::{Error, ErrorKind::InvalidInput};
+
+use crate::helper::{
+    cmd_helper,
+    types::{CleanCmd, DangerCmd, SharedDB},
 };
-
-use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
-
-type KeyValue = HashMap<String, String>;
-type SharedDB = Arc<RwLock<KeyValue>>;
-type CleanCmd<'a> = (SplitWhitespace<'a>, usize);
+use crate::utils::aof_handler;
 
 pub async fn proc_cmd(cmd: &str, storage: &mut SharedDB) -> Result<String, Error> {
-    let mut argv = clean_cmd(cmd);
+    let mut argv = cmd_helper::split_cmd(cmd);
     match argv.0.next() {
-        Some("SET") => set_cmd(&mut argv, &mut storage.write().await),
-        Some("GET") => get_cmd(&mut argv, &mut storage.read().await),
-        Some("DEL") => del_cmd(&mut argv, &mut storage.write().await),
+        Some("SET") => set_cmd(&mut argv, storage).await,
+        Some("GET") => get_cmd(&mut argv, storage).await,
+        Some("DEL") => del_cmd(&mut argv, storage).await,
         Some(other) => Err(Error::new(
             InvalidInput,
             format!("Invalid command: {}", other),
@@ -25,16 +20,11 @@ pub async fn proc_cmd(cmd: &str, storage: &mut SharedDB) -> Result<String, Error
     }
 }
 
-fn set_cmd(argv: &mut CleanCmd, storage: &mut RwLockWriteGuard<KeyValue>) -> Result<String, Error> {
-    if argv.1 != 3 {
-        return Err(Error::new(
-            InvalidInput,
-            format!(
-                "Invalid arguments for SET command: expected 2 args, found {}",
-                argv.1 - 1
-            ),
-        ));
-    }
+async fn set_cmd<'a>(argv: &mut CleanCmd<'a>, storage: &SharedDB) -> Result<String, Error> {
+    cmd_helper::validate_set(argv)?;
+    aof_handler::append_cmd(argv.clone(), DangerCmd::Set).await;
+
+    let mut storage = storage.write().await;
     let key = argv.0.next().unwrap().to_string();
     let value = argv.0.next().unwrap().to_string();
 
@@ -42,16 +32,10 @@ fn set_cmd(argv: &mut CleanCmd, storage: &mut RwLockWriteGuard<KeyValue>) -> Res
     Ok(String::from("OK"))
 }
 
-fn get_cmd(argv: &mut CleanCmd, storage: &mut RwLockReadGuard<KeyValue>) -> Result<String, Error> {
-    if argv.1 != 2 {
-        return Err(Error::new(
-            InvalidInput,
-            format!(
-                "Invalid arguments for GET command: expected 1 args, found {}",
-                argv.1 - 1
-            ),
-        ));
-    }
+async fn get_cmd<'a>(argv: &mut CleanCmd<'a>, storage: &SharedDB) -> Result<String, Error> {
+    cmd_helper::validate_get(argv)?;
+
+    let storage = storage.read().await;
     let key = argv.0.next().unwrap().to_string();
 
     match storage.get(&key) {
@@ -60,16 +44,11 @@ fn get_cmd(argv: &mut CleanCmd, storage: &mut RwLockReadGuard<KeyValue>) -> Resu
     }
 }
 
-fn del_cmd(argv: &mut CleanCmd, storage: &mut RwLockWriteGuard<KeyValue>) -> Result<String, Error> {
-    if argv.1 != 2 {
-        return Err(Error::new(
-            InvalidInput,
-            format!(
-                "Invalid arguments for DEL command: expected 1 args, found {}",
-                argv.1 - 1
-            ),
-        ));
-    }
+async fn del_cmd<'a>(argv: &mut CleanCmd<'a>, storage: &SharedDB) -> Result<String, Error> {
+    cmd_helper::validate_del(argv)?;
+    aof_handler::append_cmd(argv.clone(), DangerCmd::Del).await;
+
+    let mut storage = storage.write().await;
     let key = argv.0.next().unwrap().to_string();
 
     match storage.remove(&key) {
@@ -78,16 +57,11 @@ fn del_cmd(argv: &mut CleanCmd, storage: &mut RwLockWriteGuard<KeyValue>) -> Res
     }
 }
 
-fn clean_cmd(cmd: &'_ str) -> CleanCmd<'_> {
-    let argv = cmd.split_whitespace();
-    let len = argv.clone().count();
-
-    (argv, len)
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::{collections::HashMap, sync::Arc};
+    use tokio::sync::RwLock;
 
     fn setup_storage() -> SharedDB {
         Arc::new(RwLock::new(HashMap::new()))
