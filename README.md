@@ -8,22 +8,22 @@ This project demonstrates how to implement a database server with networking, co
 ## ✨ Features (Planned & Implemented)
 
 ### ✅ Phase 1 – Minimal Key–Value Store
-- [ ] In-memory storage with `HashMap<String, String>`
-- [ ] Basic commands:
+- [x] In-memory storage with `HashMap<String, String>`
+- [x] Basic commands:
   - `SET key value`
   - `GET key`
   - `DEL key`
-- [ ] Simple text-based command parsing
+- [x] Simple text-based command parsing
 
 ### 🔌 Phase 2 – Networking
-- [ ] TCP server socket
-- [ ] Accept multiple client connections
-- [ ] Handle concurrent clients (multi-threading / async I/O)
-- [ ] Command/response over custom protocol
+- [x] TCP server socket
+- [x] Accept multiple client connections
+- [x] Handle concurrent clients (multi-threading / async I/O)
+- [x] Command/response over custom protocol
 
 ### 💾 Phase 3 – Persistence
 - [ ] Snapshotting (periodically save DB to file)
-- [ ] Append-only log (AOF) for crash recovery
+- [x] Append-only log (AOF) for crash recovery
 
 ### 📚 Phase 4 – Data Structures
 - [ ] Lists (`LPUSH`, `RPOP`)
