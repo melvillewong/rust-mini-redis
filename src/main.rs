@@ -29,15 +29,14 @@ async fn main() -> std::io::Result<()> {
                         // echo back client's message
                         let client_cmd = String::from_utf8_lossy(&buf[..byte_read]);
                         match proc_cmd(&client_cmd, &mut storage) {
-                            Ok(res) => {
-                                if let Err(e) =
-                                    socket.write_all(format!("{}\n", res).as_bytes()).await
-                                {
-                                    eprintln!("Failed to write to {}: {}", addr, e);
-                                    return;
-                                }
-                            }
-                            Err(e) => eprintln!("{}", e),
+                            Ok(res) => socket
+                                .write_all(format!("{}\n", res).as_bytes())
+                                .await
+                                .expect("Failed to write res message"),
+                            Err(e) => socket
+                                .write_all(format!("{}\n", e).as_bytes())
+                                .await
+                                .expect("Failed to write err message"),
                         }
                         println!("{:?}", &storage);
                     }
