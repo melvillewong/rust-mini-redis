@@ -2,17 +2,21 @@ use std::{
     collections::HashMap,
     io::{Error, ErrorKind::InvalidInput},
     str::SplitWhitespace,
+    sync::Arc,
 };
 
+use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+
 type KeyValue = HashMap<String, String>;
+type SharedDB = Arc<RwLock<KeyValue>>;
 type CleanCmd<'a> = (SplitWhitespace<'a>, usize);
 
-pub fn proc_cmd(cmd: &str, storage: &mut KeyValue) -> Result<String, Error> {
+pub async fn proc_cmd(cmd: &str, storage: &mut SharedDB) -> Result<String, Error> {
     let mut argv = clean_cmd(cmd);
     match argv.0.next() {
-        Some("SET") => set_cmd(&mut argv, storage),
-        Some("GET") => get_cmd(&mut argv, storage),
-        Some("DEL") => del_cmd(&mut argv, storage),
+        Some("SET") => set_cmd(&mut argv, &mut storage.write().await),
+        Some("GET") => get_cmd(&mut argv, &mut storage.read().await),
+        Some("DEL") => del_cmd(&mut argv, &mut storage.write().await),
         Some(other) => Err(Error::new(
             InvalidInput,
             format!("Invalid command: {}", other),
@@ -21,11 +25,14 @@ pub fn proc_cmd(cmd: &str, storage: &mut KeyValue) -> Result<String, Error> {
     }
 }
 
-fn set_cmd(argv: &mut CleanCmd, storage: &mut KeyValue) -> Result<String, Error> {
+fn set_cmd(argv: &mut CleanCmd, storage: &mut RwLockWriteGuard<KeyValue>) -> Result<String, Error> {
     if argv.1 != 3 {
         return Err(Error::new(
             InvalidInput,
-            "Invalid arguments for SET command",
+            format!(
+                "Invalid arguments for SET command: expected 2 args, found {}",
+                argv.1 - 1
+            ),
         ));
     }
     let key = argv.0.next().unwrap().to_string();
@@ -35,11 +42,14 @@ fn set_cmd(argv: &mut CleanCmd, storage: &mut KeyValue) -> Result<String, Error>
     Ok(String::from("OK"))
 }
 
-fn get_cmd(argv: &mut CleanCmd, storage: &mut KeyValue) -> Result<String, Error> {
+fn get_cmd(argv: &mut CleanCmd, storage: &mut RwLockReadGuard<KeyValue>) -> Result<String, Error> {
     if argv.1 != 2 {
         return Err(Error::new(
             InvalidInput,
-            "Invalid arguments for GET command",
+            format!(
+                "Invalid arguments for GET command: expected 1 args, found {}",
+                argv.1 - 1
+            ),
         ));
     }
     let key = argv.0.next().unwrap().to_string();
@@ -50,11 +60,14 @@ fn get_cmd(argv: &mut CleanCmd, storage: &mut KeyValue) -> Result<String, Error>
     }
 }
 
-fn del_cmd(argv: &mut CleanCmd, storage: &mut KeyValue) -> Result<String, Error> {
+fn del_cmd(argv: &mut CleanCmd, storage: &mut RwLockWriteGuard<KeyValue>) -> Result<String, Error> {
     if argv.1 != 2 {
         return Err(Error::new(
             InvalidInput,
-            "Invalid arguments for DEL command",
+            format!(
+                "Invalid arguments for DEL command: expected 1 args, found {}",
+                argv.1 - 1
+            ),
         ));
     }
     let key = argv.0.next().unwrap().to_string();
@@ -75,67 +88,68 @@ fn clean_cmd(cmd: &'_ str) -> CleanCmd<'_> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::collections::HashMap;
 
-    fn setup_storage() -> KeyValue {
-        HashMap::new()
+    fn setup_storage() -> SharedDB {
+        Arc::new(RwLock::new(HashMap::new()))
     }
 
-    #[test]
-    fn test_set_new_key() {
+    #[tokio::test]
+    async fn test_set_new_key() {
         let mut storage = setup_storage();
-        let result = proc_cmd("SET foo bar", &mut storage).unwrap();
+        let result = proc_cmd("SET foo bar", &mut storage).await.unwrap();
         assert_eq!(result, "OK");
-        assert_eq!(storage.get("foo"), Some(&"bar".to_string()));
+        let guard = storage.read().await;
+        assert_eq!(guard.get("foo"), Some(&"bar".to_string()));
     }
 
-    #[test]
-    fn test_set_overwrite_existing() {
+    #[tokio::test]
+    async fn test_set_overwrite_existing() {
         let mut storage = setup_storage();
-        proc_cmd("SET foo bar", &mut storage).unwrap();
-        let result = proc_cmd("SET foo baz", &mut storage).unwrap();
+        proc_cmd("SET foo bar", &mut storage).await.unwrap();
+        let result = proc_cmd("SET foo baz", &mut storage).await.unwrap();
         assert_eq!(result, "OK");
-        assert_eq!(storage.get("foo"), Some(&"baz".to_string())); // overwritten
+        let guard = storage.read().await;
+        assert_eq!(guard.get("foo"), Some(&"baz".to_string())); // overwritten
     }
 
-    #[test]
-    fn test_get_existing_key() {
+    #[tokio::test]
+    async fn test_get_existing_key() {
         let mut storage = setup_storage();
-        proc_cmd("SET name Alice", &mut storage).unwrap();
-        let result = proc_cmd("GET name", &mut storage).unwrap();
+        proc_cmd("SET name Alice", &mut storage).await.unwrap();
+        let result = proc_cmd("GET name", &mut storage).await.unwrap();
         assert_eq!(result, "Alice");
     }
 
-    #[test]
-    fn test_get_nonexistent_key() {
+    #[tokio::test]
+    async fn test_get_nonexistent_key() {
         let mut storage = setup_storage();
-        let result = proc_cmd("GET missing", &mut storage).unwrap();
+        let result = proc_cmd("GET missing", &mut storage).await.unwrap();
         assert_eq!(result, "(nil)");
     }
 
-    #[test]
-    fn test_del_existing_key() {
+    #[tokio::test]
+    async fn test_del_existing_key() {
         let mut storage = setup_storage();
-        proc_cmd("SET mykey hello", &mut storage).unwrap();
-        let result = proc_cmd("DEL mykey", &mut storage).unwrap();
+        proc_cmd("SET mykey hello", &mut storage).await.unwrap();
+        let result = proc_cmd("DEL mykey", &mut storage).await.unwrap();
         assert_eq!(result, "(integer) 1"); // key existed and was deleted
-        assert!(!storage.contains_key("mykey"));
+        let guard = storage.read().await;
+        assert!(!guard.contains_key("mykey"));
     }
 
-    #[test]
-    fn test_del_nonexistent_key() {
+    #[tokio::test]
+    async fn test_del_nonexistent_key() {
         let mut storage = setup_storage();
-        let result = proc_cmd("DEL not_here", &mut storage).unwrap();
+        let result = proc_cmd("DEL not_here", &mut storage).await.unwrap();
         assert_eq!(result, "(integer) 0"); // no key deleted
     }
 
-    #[test]
-    fn test_get_after_del() {
+    #[tokio::test]
+    async fn test_get_after_del() {
         let mut storage = setup_storage();
-        proc_cmd("SET foo bar", &mut storage).unwrap();
-        proc_cmd("DEL foo", &mut storage).unwrap();
-        let result = proc_cmd("GET foo", &mut storage).unwrap();
+        proc_cmd("SET foo bar", &mut storage).await.unwrap();
+        proc_cmd("DEL foo", &mut storage).await.unwrap();
+        let result = proc_cmd("GET foo", &mut storage).await.unwrap();
         assert_eq!(result, "(nil)");
     }
 }
-

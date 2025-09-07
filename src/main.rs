@@ -1,10 +1,13 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use rust_mini_redis::proc_cmd;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpListener,
+    sync::RwLock,
 };
+
+type SharedDB = Arc<RwLock<HashMap<String, String>>>;
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
@@ -12,12 +15,17 @@ async fn main() -> std::io::Result<()> {
     let listen = TcpListener::bind("127.0.0.1:6379").await?;
     println!("Listening on localhost:6379");
 
+    let arc_storage: SharedDB = Arc::new(RwLock::new(HashMap::new()));
+
+    // Handle each connection
     while let Ok((mut socket, addr)) = listen.accept().await {
         println!("New client connected: {}", addr);
 
+        let mut storage_clone = Arc::clone(&arc_storage);
+
+        // Handle client's communication
         tokio::spawn(async move {
             let mut buf = [0u8; 512];
-            let mut storage = HashMap::<String, String>::new();
 
             loop {
                 match socket.read(&mut buf).await {
@@ -28,7 +36,7 @@ async fn main() -> std::io::Result<()> {
                     Ok(byte_read) => {
                         // echo back client's message
                         let client_cmd = String::from_utf8_lossy(&buf[..byte_read]);
-                        match proc_cmd(&client_cmd, &mut storage) {
+                        match proc_cmd(&client_cmd, &mut storage_clone).await {
                             Ok(res) => socket
                                 .write_all(format!("{}\n", res).as_bytes())
                                 .await
@@ -38,7 +46,7 @@ async fn main() -> std::io::Result<()> {
                                 .await
                                 .expect("Failed to write err message"),
                         }
-                        println!("{:?}", &storage);
+                        println!("{:?}", &storage_clone.read().await);
                     }
                     Err(e) => {
                         eprintln!("Failed to read from {}: {}", addr, e);
