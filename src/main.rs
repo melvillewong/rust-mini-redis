@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use rust_mini_redis::proc_cmd;
+use rust_mini_redis::utils::cmd_handler;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpListener,
@@ -36,7 +36,7 @@ async fn main() -> std::io::Result<()> {
                     Ok(byte_read) => {
                         // echo back client's message
                         let client_cmd = String::from_utf8_lossy(&buf[..byte_read]);
-                        match proc_cmd(&client_cmd, &mut storage_clone).await {
+                        match cmd_handler::proc_cmd(&client_cmd, &mut storage_clone).await {
                             Ok(res) => socket
                                 .write_all(format!("{}\n", res).as_bytes())
                                 .await
