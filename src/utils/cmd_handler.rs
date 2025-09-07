@@ -46,13 +46,16 @@ async fn get_cmd<'a>(argv: &mut CleanCmd<'a>, storage: &SharedDB) -> Result<Stri
 
 async fn del_cmd<'a>(argv: &mut CleanCmd<'a>, storage: &SharedDB) -> Result<String, Error> {
     cmd_helper::validate_del(argv)?;
-    aof_handler::append_cmd(argv.clone(), DangerCmd::Del).await;
+    let argv_clone = argv.clone();
 
     let mut storage = storage.write().await;
     let key = argv.0.next().unwrap().to_string();
 
     match storage.remove(&key) {
-        Some(_) => Ok("(integer) 1".to_string()),
+        Some(_) => {
+            aof_handler::append_cmd(argv_clone, DangerCmd::Del).await;
+            Ok("(integer) 1".to_string())
+        }
         None => Ok("(integer) 0".to_string()),
     }
 }
