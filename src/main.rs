@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use rust_mini_redis::utils::cmd_handler;
+use rust_mini_redis::utils::{aof_handler, cmd_handler};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpListener,
@@ -15,7 +15,8 @@ async fn main() -> std::io::Result<()> {
     let listen = TcpListener::bind("127.0.0.1:6379").await?;
     println!("Listening on localhost:6379");
 
-    let arc_storage: SharedDB = Arc::new(RwLock::new(HashMap::new()));
+    let mut arc_storage: SharedDB = Arc::new(RwLock::new(HashMap::new()));
+    aof_handler::startup_load(&mut arc_storage).await;
 
     // Handle each connection
     while let Ok((mut socket, addr)) = listen.accept().await {
@@ -34,9 +35,8 @@ async fn main() -> std::io::Result<()> {
                         return;
                     }
                     Ok(byte_read) => {
-                        // echo back client's message
                         let client_cmd = String::from_utf8_lossy(&buf[..byte_read]);
-                        match cmd_handler::proc_cmd(&client_cmd, &mut storage_clone).await {
+                        match cmd_handler::proc_cmd(&client_cmd, &mut storage_clone, false).await {
                             Ok(res) => socket
                                 .write_all(format!("{}\n", res).as_bytes())
                                 .await
