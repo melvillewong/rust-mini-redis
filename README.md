@@ -5,9 +5,9 @@ This project demonstrates how to implement a database server with networking, co
 
 ---
 
-## ✨ Features (Planned & Implemented)
+## Features (Planned & Implemented)
 
-### ✅ Phase 1 – Minimal Key–Value Store
+### Minimal Key–Value Store
 - [x] In-memory storage with `HashMap<String, String>`
 - [x] Basic commands:
   - `SET key value`
@@ -15,29 +15,29 @@ This project demonstrates how to implement a database server with networking, co
   - `DEL key`
 - [x] Simple text-based command parsing
 
-### 🔌 Phase 2 – Networking
+### Networking
 - [x] TCP server socket
 - [x] Accept multiple client connections
 - [x] Handle concurrent clients (multi-threading / async I/O)
 - [x] Command/response over custom protocol
 
-### 💾 Phase 3 – Persistence
+### Persistence
 - [ ] Snapshotting (periodically save DB to file)
 - [x] Append-only log (AOF) for crash recovery
 
-### 📚 Phase 4 – Data Structures
+### Data Structures
 - [ ] Lists (`LPUSH`, `RPOP`)
 - [ ] Sets (`SADD`, `SMEMBERS`)
 - [ ] Pub/Sub (`PUBLISH`, `SUBSCRIBE`)
 
-### 🚀 Phase 5 – Extras
+### Extras
 - [ ] Key expiry (`SETEX key seconds value`)
 - [ ] Transactions (`MULTI`, `EXEC`)
 - [ ] Simple clustering / sharding
 
 ---
 
-## 📖 Roadmap
+## Roadmap
 
 1. **Core storage** — Implement in-memory key–value operations with a parser for `SET`, `GET`, and `DEL`.
 2. **Networking** — Add TCP server, handle multiple clients, and support a simple request/response protocol.
@@ -47,7 +47,7 @@ This project demonstrates how to implement a database server with networking, co
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 - **Language**: Rust
 - **Concurrency**: Multi-threading or async event loop
@@ -57,7 +57,7 @@ This project demonstrates how to implement a database server with networking, co
 
 ---
 
-## 🎯 Learning Goals
+## Learning Goals
 
 By building this project, I aim to strengthen skills in:
 
@@ -71,7 +71,7 @@ By building this project, I aim to strengthen skills in:
 
 ---
 
-## 🚀 Running the Project
+## Running the Project
 
 ```bash
 # Clone the repository
