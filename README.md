@@ -22,8 +22,10 @@ This project demonstrates how to implement a database server with networking, co
 - [x] Command/response over custom protocol
 
 ### Persistence
+- [x] Snapshotting (manually save DB with SAVE command)
 - [ ] Snapshotting (periodically save DB to file)
 - [x] Append-only log (AOF) for crash recovery
+- [x] Load Snapshotting first, then AoF on startup
 
 ### Data Structures
 - [ ] Lists (`LPUSH`, `RPOP`)
