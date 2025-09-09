@@ -1,13 +1,13 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
-use rust_mini_redis::utils::{aof_handler, cmd_handler};
+use rust_mini_redis::{
+    types::MAX_BUFFER,
+    utils::{aof_handler, cmd_handler, snapshot_handler},
+};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpListener,
-    sync::RwLock,
 };
-
-type SharedDB = Arc<RwLock<HashMap<String, String>>>;
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
@@ -15,7 +15,8 @@ async fn main() -> std::io::Result<()> {
     let listen = TcpListener::bind("127.0.0.1:6379").await?;
     println!("Listening on localhost:6379");
 
-    let mut arc_storage: SharedDB = Arc::new(RwLock::new(HashMap::new()));
+    // Load snapshot (db.json), then aof (db.aof) for perciseness
+    let mut arc_storage = snapshot_handler::snapshot_load().await;
     aof_handler::startup_load(&mut arc_storage).await;
 
     // Handle each connection
@@ -26,7 +27,7 @@ async fn main() -> std::io::Result<()> {
 
         // Handle client's communication
         tokio::spawn(async move {
-            let mut buf = [0u8; 512];
+            let mut buf = [0u8; MAX_BUFFER];
 
             loop {
                 match socket.read(&mut buf).await {

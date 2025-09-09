@@ -1,17 +1,13 @@
-use std::io::Error;
-
-use tokio::{
-    fs::{File, OpenOptions},
-    io::{AsyncReadExt, AsyncWriteExt},
-};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::{
-    helper::types::{CleanCmd, DangerCmd, SharedDB},
+    helper::file_helper::{open_file_read, open_file_write},
+    types::{CleanCmd, DangerCmd, SharedDB},
     utils::cmd_handler::proc_cmd,
 };
 
 pub async fn append_cmd<'a>(argv: CleanCmd<'a>, cmd_type: DangerCmd) {
-    let mut file = open_file_write().await;
+    let mut file = open_file_write("db.aof", false).await;
 
     let prefix_argv = match cmd_type {
         DangerCmd::Set => std::iter::once("SET").chain(argv.0),
@@ -26,7 +22,7 @@ pub async fn append_cmd<'a>(argv: CleanCmd<'a>, cmd_type: DangerCmd) {
 }
 
 pub async fn startup_load(storage: &mut SharedDB) {
-    if let Ok(mut file) = open_file_read().await {
+    if let Some(mut file) = open_file_read("db.aof").await {
         let mut stored = String::new();
 
         if let Err(e) = file.read_to_string(&mut stored).await {
@@ -38,20 +34,6 @@ pub async fn startup_load(storage: &mut SharedDB) {
                 eprintln!("Failed to proc_cmd during startup_load: {}", e);
             }
         }
-    } else {
-        eprintln!("Failed to Open files or no file to read: open_file_read");
+        println!("startup_aof_load succeed");
     }
-}
-
-async fn open_file_write() -> File {
-    OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("db.aof")
-        .await
-        .expect("Failed to Create or Open files: open_file_write")
-}
-
-async fn open_file_read() -> Result<File, Error> {
-    OpenOptions::new().read(true).open("db.aof").await
 }

@@ -1,10 +1,13 @@
-use std::io::{Error, ErrorKind::InvalidInput};
-
-use crate::helper::{
-    cmd_helper,
-    types::{CleanCmd, DangerCmd, SharedDB},
+use std::io::{
+    Error,
+    ErrorKind::{InvalidInput, Other},
 };
-use crate::utils::aof_handler;
+
+use crate::{helper::cmd_helper, utils::snapshot_handler::snapshot_save};
+use crate::{
+    types::{CleanCmd, DangerCmd, SharedDB},
+    utils::aof_handler,
+};
 
 pub async fn proc_cmd(cmd: &str, storage: &mut SharedDB, replay: bool) -> Result<String, Error> {
     let mut argv = cmd_helper::split_cmd(cmd);
@@ -12,11 +15,21 @@ pub async fn proc_cmd(cmd: &str, storage: &mut SharedDB, replay: bool) -> Result
         Some("SET") => set_cmd(&mut argv, storage, replay).await,
         Some("GET") => get_cmd(&mut argv, storage).await,
         Some("DEL") => del_cmd(&mut argv, storage, replay).await,
+        Some("SAVE") => save_cmd(&mut argv, storage).await,
         Some(other) => Err(Error::new(
             InvalidInput,
             format!("Invalid command: {}", other),
         )),
         None => Err(Error::new(InvalidInput, "Empty command")),
+    }
+}
+
+async fn save_cmd<'a>(argv: &mut CleanCmd<'a>, storage: &SharedDB) -> Result<String, Error> {
+    cmd_helper::validate_save(argv)?;
+
+    match snapshot_save(storage).await {
+        Ok(_) => Ok(String::from("OK")),
+        Err(e) => Err(Error::new(Other, format!("ERR {}", e))),
     }
 }
 

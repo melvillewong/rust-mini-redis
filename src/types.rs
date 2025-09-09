@@ -10,3 +10,5 @@ pub enum DangerCmd {
 pub type CleanCmd<'a> = (SplitWhitespace<'a>, usize);
 pub type KeyValue = HashMap<String, String>;
 pub type SharedDB = Arc<RwLock<KeyValue>>;
+
+pub const MAX_BUFFER: usize = 512;

@@ -5,6 +5,19 @@ use std::{
 
 type CleanCmd<'a> = (SplitWhitespace<'a>, usize);
 
+pub fn validate_save(argv: &CleanCmd) -> Result<(), Error> {
+    if argv.1 != 1 {
+        return Err(Error::new(
+            InvalidInput,
+            format!(
+                "Invalid arguments for SET command: expected 0 args, found {}",
+                argv.1 - 1
+            ),
+        ));
+    }
+    Ok(())
+}
+
 pub fn validate_set(argv: &CleanCmd) -> Result<(), Error> {
     if argv.1 != 3 {
         return Err(Error::new(
@@ -17,6 +30,7 @@ pub fn validate_set(argv: &CleanCmd) -> Result<(), Error> {
     }
     Ok(())
 }
+
 pub fn validate_get(argv: &CleanCmd) -> Result<(), Error> {
     if argv.1 != 2 {
         return Err(Error::new(
@@ -29,6 +43,7 @@ pub fn validate_get(argv: &CleanCmd) -> Result<(), Error> {
     }
     Ok(())
 }
+
 pub fn validate_del(argv: &CleanCmd) -> Result<(), Error> {
     if argv.1 != 2 {
         return Err(Error::new(
