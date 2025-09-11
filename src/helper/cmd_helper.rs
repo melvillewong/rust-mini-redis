@@ -3,6 +3,8 @@ use std::{
     str::SplitWhitespace,
 };
 
+use crate::helper::cmd_opt_helper::validate_ex;
+
 type CleanCmd<'a> = (SplitWhitespace<'a>, usize);
 
 pub fn validate_save(argv: &CleanCmd) -> Result<(), Error> {
@@ -19,16 +21,28 @@ pub fn validate_save(argv: &CleanCmd) -> Result<(), Error> {
 }
 
 pub fn validate_set(argv: &CleanCmd) -> Result<(), Error> {
-    if argv.1 != 3 {
-        return Err(Error::new(
+    match argv.1 {
+        3 => Ok(()),
+        5 => {
+            let mut argv_clone = argv.0.clone();
+            if let Some(opt_cmd) = argv_clone.nth(2) {
+                validate_ex(opt_cmd, argv_clone.next().unwrap())
+            } else {
+                Err(Error::new(
+                    InvalidInput,
+                    "Invalid arguments for SET command\ne.g. SET key value EX 1800",
+                ))
+            }
+        }
+        _ => Err(Error::new(
             InvalidInput,
             format!(
-                "Invalid arguments for SET command: expected 2 args, found {}",
+                "Invalid arguments for SET command: expected {} args, found {}",
+                if argv.1 > 3 { 4 } else { 2 },
                 argv.1 - 1
             ),
-        ));
+        )),
     }
-    Ok(())
 }
 
 pub fn validate_get(argv: &CleanCmd) -> Result<(), Error> {

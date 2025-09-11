@@ -46,6 +46,8 @@ async fn set_cmd<'a>(
         aof_handler::append_cmd(argv.clone(), DangerCmd::Set).await;
     }
 
+    // TODO: ex_cmd
+
     let mut storage = storage.write().await;
     let key = argv.0.next().unwrap().to_string();
     let value = argv.0.next().unwrap().to_string();
