@@ -23,6 +23,7 @@ async fn main() -> std::io::Result<()> {
     while let Ok((mut socket, addr)) = listen.accept().await {
         println!("New client connected: {}", addr);
 
+        // Clone storage access for multiple tasks
         let mut storage_clone = Arc::clone(&arc_storage);
 
         // Handle client's communication

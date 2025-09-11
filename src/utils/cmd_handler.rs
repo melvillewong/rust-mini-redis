@@ -9,6 +9,7 @@ use crate::{
     utils::aof_handler,
 };
 
+// replay true for aof loaded at startup
 pub async fn proc_cmd(cmd: &str, storage: &mut SharedDB, replay: bool) -> Result<String, Error> {
     let mut argv = cmd_helper::split_cmd(cmd);
     match argv.0.next() {
@@ -40,6 +41,7 @@ async fn set_cmd<'a>(
 ) -> Result<String, Error> {
     cmd_helper::validate_set(argv)?;
 
+    // append to aof
     if !replay {
         aof_handler::append_cmd(argv.clone(), DangerCmd::Set).await;
     }
